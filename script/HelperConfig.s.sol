@@ -32,17 +32,13 @@ contract HelperConfig is Script {
 
     function getSepoliaConfig() public view returns (NetworkConfig memory) {
         return NetworkConfig(
-            0x694AA1769357215DE4FAC081bf1f309aDC325306, // weth address
+            0x694AA1769357215DE4FAC081bf1f309aDC325306, // wethPriceFeed
             0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43, //wbtcPriceFeed
             0xdd13E55209Fd76AfE204dBda4007C227904f0a81, //weth
             0x92f3B59a79bFf5dc60c0d59eA13a44D082B2bdFC, //wbtc
             vm.envUint("PRIVATE_KEY") //deployerKey
         );
     }
-
-    // function getConfig() public returns (NetworkConfig memory) {
-    //     return getConfigByChainID(block.chainid);
-    // }
 
     function getorCreateAnvilConfig() public returns (NetworkConfig memory) {
         if (localNetworkConfig.wethPriceFeed != address(0)) {

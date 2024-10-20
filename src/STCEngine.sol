@@ -186,14 +186,19 @@ contract STCEngine is ReentrancyGuard {
         for (uint256 i = 0; i < s_collateralTokens.length; i++) {
             address token = s_collateralTokens[i];
             uint256 amountCollateralDepositedByUser = s_tokenCollateralDeposited[user][token];
-            collateralValueInUsd += getValueInUsd(token, amountCollateralDepositedByUser);
+            collateralValueInUsd += getConvertedValueInUsd(token, amountCollateralDepositedByUser);
         }
         return collateralValueInUsd;
     }
 
-    function getValueInUsd(address token, uint256 amount) public view returns (uint256 convertedValue) {
+    function getConvertedValueInUsd(address token, uint256 amount) view public returns (uint256) {
+        int256 price = getPriceInUsd(token);
+        return ((uint256(price) * ADDITIONAL_FEED_PRECISION)*amount) / PRECISION;
+    }
+
+    function getPriceInUsd(address token) public view returns (int256) {
         // using aggrigratorV3Interface
-        AggregatorV3Interface dataFeed = AggregatorV3Interface(s_priceFeedsToken[token]);
+        AggregatorV3Interface dataFeed = AggregatorV3Interface(token);
         (
             /* uint80 roundID */
             ,
@@ -204,6 +209,13 @@ contract STCEngine is ReentrancyGuard {
             ,
             /*uint80 answeredInRound*/
         ) = dataFeed.latestRoundData();
-        convertedValue = (amount * (uint256(answer) * ADDITIONAL_FEED_PRECISION)) / PRECISION;
+        return answer;
+    }
+
+     /// / / / / / / / / / / / / /
+    // view functions / / / / /
+    /// / / / / / / / / / / / / /
+    function getPriceFeedAddress(address token) view public returns (address) {
+        return s_priceFeedsToken[token];
     }
 }

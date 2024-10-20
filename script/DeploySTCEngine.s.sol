@@ -12,18 +12,16 @@ contract DeployStcEngine is Script {
     address[] public tokenAddresses;
     address[] public priceFeedAddresses;
 
-    function setUp() public {
-        // HelperConfig helperConfig = new HelperConfig();
-        // priceFeedAddresses.push(helperConfig.localNetworkConfig.wethPriceFeed);
-        // priceFeedAddresses.push(helperConfig.localNetworkConfig.wbtcPriceFeed);
-        // tokenAddresses.push(helperConfig.localNetworkConfig.weth);
-        // tokenAddresses.push(helperConfig.localNetworkConfig.wbtc);
-    }
-
     function run() public returns (STCEngine, StableCoin) {
         HelperConfig helperConfig = new HelperConfig();
         (address wethPriceFeed, address wbtcPriceFeed, address weth, address wbtc, uint256 deployerKey) =
             helperConfig.localNetworkConfig();
+        // tokenAddresses.push(weth);
+        // tokenAddresses.push(wbtc);
+        // priceFeedAddresses.push(wethPriceFeed);
+        // priceFeedAddresses.push(wbtcPriceFeed);
+        console.log("WETH address:", weth);
+        console.log("WETH price feed address:", wethPriceFeed);
         priceFeedAddresses = [wethPriceFeed , wbtcPriceFeed];
         tokenAddresses =[weth , wbtc];
 
