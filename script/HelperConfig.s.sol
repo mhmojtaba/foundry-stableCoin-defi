@@ -56,11 +56,18 @@ contract HelperConfig is Script {
         // MockERC20 wbtcAddress = new MockERC20().initialize("WBTC","wbtc", 8); // ERC20mock contract using forge-std
         vm.stopBroadcast();
 
+        // localNetworkConfig = NetworkConfig(
+        //     address(wethUsdPrice), // weth address
+        //     address(wbtcUsdPrice), //wbtcPriceFeed
+        //     address(wethAddress), //weth
+        //     address(wbtcAddress), //wbtc
+        //     vm.envUint("DEFAULT_ANVIL_KEY") //deployerKey
+        // );
         localNetworkConfig = NetworkConfig(
-            address(wethUsdPrice), // weth address
-            address(wbtcUsdPrice), //wbtcPriceFeed
-            address(wethAddress), //weth
-            address(wbtcAddress), //wbtc
+            0x50EEf481cae4250d252Ae577A09bF514f224C6C4, // weth address
+            0x62c20Aa1e0272312BC100b4e23B4DC1Ed96dD7D1, //wbtcPriceFeed
+            0xDEb1E9a6Be7Baf84208BB6E10aC9F9bbE1D70809, //weth
+            0xD718d5A27a29FF1cD22403426084bA0d479869a0, //wbtc
             vm.envUint("DEFAULT_ANVIL_KEY") //deployerKey
         );
         return localNetworkConfig;

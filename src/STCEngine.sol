@@ -20,7 +20,7 @@ contract STCEngine is ReentrancyGuard {
     /// / / / / / / / / / / / / /
     // errors / / / / /
     /// / / / / / / / / / / / / /
-    error STCEngine__MorethanZero(uint256 amount);
+    error STCEngine__MorethanZero();
     error STCEngine__notAllowedToken(address token);
     error STCEngine__tokenAndPricefeedAddressMustHaveSameLength();
     error STCEngine__tokenTransferFailed();
@@ -54,7 +54,7 @@ contract STCEngine is ReentrancyGuard {
     /// / / / / / / / / / / / / /
     modifier moreThanzero(uint256 amount) {
         if (amount == 0) {
-            revert STCEngine__MorethanZero(amount);
+            revert STCEngine__MorethanZero();
         }
         _;
     }
@@ -83,13 +83,16 @@ contract STCEngine is ReentrancyGuard {
     /// / / / / / / / / / / / / /
     // external functions / / / / /
     /// / / / / / / / / / / / / /
-    function depositeCollateralAndMintSTC() external {}
+    function depositeCollateralAndMintSTC(address tokenCollateralAddress, uint256 collateralAmount, uint256 stcToMint) external {
+        depositeCollateral(tokenCollateralAddress, collateralAmount);
+        mintSTC(stcToMint);
+    }
 
     /// @notice deposit collateral tokens
     /// @param tokenCollateralAddress the address of token to deposite as collateral
     /// @param collateralAmount the amount of token to deposite
     function depositeCollateral(address tokenCollateralAddress, uint256 collateralAmount)
-        external
+        public
         moreThanzero(collateralAmount)
         tokenAllowed(tokenCollateralAddress)
         nonReentrant
@@ -130,7 +133,7 @@ contract STCEngine is ReentrancyGuard {
     /// @notice mintSTC ! they must have more collateral value than min threshold
     /// @param amountSTC the amount of STc token
     ///
-    function minSTC(uint256 amountSTC) external moreThanzero(amountSTC) nonReentrant {
+    function mintSTC(uint256 amountSTC) public moreThanzero(amountSTC) nonReentrant {
         s_STCMinted[msg.sender] += amountSTC; // update state
 
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -191,14 +194,14 @@ contract STCEngine is ReentrancyGuard {
         return collateralValueInUsd;
     }
 
-    function getConvertedValueInUsd(address token, uint256 amount) view public returns (uint256) {
+    function getConvertedValueInUsd(address token, uint256 amount) public view returns (uint256) {
         int256 price = getPriceInUsd(token);
-        return ((uint256(price) * ADDITIONAL_FEED_PRECISION)*amount) / PRECISION;
+        return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
 
     function getPriceInUsd(address token) public view returns (int256) {
         // using aggrigratorV3Interface
-        AggregatorV3Interface dataFeed = AggregatorV3Interface(token);
+        AggregatorV3Interface dataFeed = AggregatorV3Interface(s_priceFeedsToken[token]);
         (
             /* uint80 roundID */
             ,
@@ -212,10 +215,10 @@ contract STCEngine is ReentrancyGuard {
         return answer;
     }
 
-     /// / / / / / / / / / / / / /
+    /// / / / / / / / / / / / / /
     // view functions / / / / /
     /// / / / / / / / / / / / / /
-    function getPriceFeedAddress(address token) view public returns (address) {
+    function getPriceFeedAddress(address token) public view returns (address) {
         return s_priceFeedsToken[token];
     }
 }
