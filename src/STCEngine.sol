@@ -49,6 +49,7 @@ contract STCEngine is ReentrancyGuard {
     // events / / / / /
     /// / / / / / / / / / / / / /
     event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
+    event CollateralRedeeemed(address indexed sender, address indexed token, uint256 amount);
 
     // modifires / / / / /
     /// / / / / / / / / / / / / /
@@ -83,7 +84,9 @@ contract STCEngine is ReentrancyGuard {
     /// / / / / / / / / / / / / /
     // external functions / / / / /
     /// / / / / / / / / / / / / /
-    function depositeCollateralAndMintSTC(address tokenCollateralAddress, uint256 collateralAmount, uint256 stcToMint) external {
+    function depositeCollateralAndMintSTC(address tokenCollateralAddress, uint256 collateralAmount, uint256 stcToMint)
+        external
+    {
         depositeCollateral(tokenCollateralAddress, collateralAmount);
         mintSTC(stcToMint);
     }
@@ -126,9 +129,39 @@ contract STCEngine is ReentrancyGuard {
         }
     }
 
-    function redeemCollateralsForSTC() external {}
-    function redeemCollateral() external {}
-    function burnSTC() external {}
+    function redeemCollateralsForSTC(address tokenCollateral, uint256 collateralAmount , uint256 stcAmount) external {
+        burnSTC(stcAmount);
+        redeemCollateral(tokenCollateral, collateralAmount);
+    }
+
+    /// @notice redeem collateral for STC
+    /// @dev Explain to a developer any extra details
+    /// @param tokenCollateral  the address of collateral token
+    /// @param collateralAmount the amount of collateral token to redeem
+    /// @notice health factor must be over 1 after collateral pulled out
+    function redeemCollateral(address tokenCollateral, uint256 collateralAmount)
+        public
+        moreThanzero(collateralAmount)
+        nonReentrant
+    {
+        s_tokenCollateralDeposited[msg.sender][tokenCollateral] -= collateralAmount;
+        emit CollateralRedeeemed(msg.sender, tokenCollateral, collateralAmount);
+        bool success = IERC20(tokenCollateral).transfer(msg.sender, collateralAmount);
+        if (!success) {
+            revert STCEngine__tokenTransferFailed();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    function burnSTC(uint256 amount) public moreThanzero(amount) {
+        s_STCMinted[msg.sender] -= amount;
+        bool success = i_STC.transferFrom(msg.sender, address(this), amount);
+        if (!success) {
+            revert STCEngine__tokenTransferFailed();
+        }
+        i_STC.burn(amount);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     /// @notice mintSTC ! they must have more collateral value than min threshold
     /// @param amountSTC the amount of STc token
@@ -143,7 +176,15 @@ contract STCEngine is ReentrancyGuard {
         }
     }
 
-    function liquidate() external {}
+    /// @notice if we do start nearing undercollateralization, we neeed someone to liquidate
+    /// @dev must remove someones position to avoid getting undercollateralization
+    /// @param collateral is the address of erc20 collateral token
+    /// @param userToLiquid is the user to liquidate who has broken the health factor
+    /// @param amount is the amount of STC we need to burn and liquid
+    /// @notice you get bounos for taking the users funds
+    /// @notice this function is working assumes the protocol will be roughly 200% overcollateralized in order to work
+    
+    function liquidate(address collateral , address userToLiquid, uint256 amount) external {}
     function getHealthFactor() external view {}
 
     /// / / / / / / / / / / / / /

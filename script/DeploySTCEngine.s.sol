@@ -17,7 +17,7 @@ contract DeployStcEngine is Script {
         (address wethPriceFeed, address wbtcPriceFeed, address weth, address wbtc, uint256 deployerKey) =
             helperConfig.localNetworkConfig();
         priceFeedAddresses = [wethPriceFeed, wbtcPriceFeed];
-        tokenAddresses = [weth, wbtc]; 
+        tokenAddresses = [weth, wbtc];
 
         vm.startBroadcast(deployerKey);
         stableCoin = new StableCoin();

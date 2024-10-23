@@ -101,7 +101,7 @@ contract CounterTest is Test {
         ERC20Mock(weth).approve(address(stcEngine), AMOUNT_COLLATERAL);
 
         vm.expectRevert(STCEngine.STCEngine__MorethanZero.selector);
-        stcEngine.depositeCollateral(weth,0);
+        stcEngine.depositeCollateral(weth, 0);
         vm.stopPrank();
     }
 
