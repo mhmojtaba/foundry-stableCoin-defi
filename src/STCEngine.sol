@@ -28,6 +28,8 @@ contract STCEngine is ReentrancyGuard {
     error STCEngine__TransferAmountExceedsBalance();
     error STCEngine__MintFailed();
     error STCEngine__HealthFactorIsBroken(uint256 userHealthFactor);
+    error STCEngine__validHealthFactor();
+    error STCEngine__HealthFactorNotImproved();
 
     /// / / / / / / / / / / / / /
     // state variables / / / / /
@@ -35,8 +37,9 @@ contract STCEngine is ReentrancyGuard {
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
     uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant LIQUIDATION_BONUS = 10; // 10 percent bonus to liquidator
     uint256 private constant LIQUIDATION_THRESHOLD = 50; // 200% overcollateralized
-    uint256 private constant MINIMUM_HEALTH_FACTOR = 1; // minimum health factor
+    uint256 private constant MINIMUM_HEALTH_FACTOR = 1e18; // minimum health factor
 
     mapping(address token => address priceFeed) private s_priceFeedsToken; // token to pricefeed
     mapping(address user => mapping(address token => uint256 amount)) private s_tokenCollateralDeposited; // how much of a specific token deposited by user
@@ -49,7 +52,7 @@ contract STCEngine is ReentrancyGuard {
     // events / / / / /
     /// / / / / / / / / / / / / /
     event CollateralDeposited(address indexed user, address indexed token, uint256 amount);
-    event CollateralRedeeemed(address indexed sender, address indexed token, uint256 amount);
+    event CollateralRedeeemed(address indexed from, address indexed to, address indexed token, uint256 amount);
 
     // modifires / / / / /
     /// / / / / / / / / / / / / /
@@ -129,7 +132,7 @@ contract STCEngine is ReentrancyGuard {
         }
     }
 
-    function redeemCollateralsForSTC(address tokenCollateral, uint256 collateralAmount , uint256 stcAmount) external {
+    function redeemCollateralsForSTC(address tokenCollateral, uint256 collateralAmount, uint256 stcAmount) external {
         burnSTC(stcAmount);
         redeemCollateral(tokenCollateral, collateralAmount);
     }
@@ -144,22 +147,12 @@ contract STCEngine is ReentrancyGuard {
         moreThanzero(collateralAmount)
         nonReentrant
     {
-        s_tokenCollateralDeposited[msg.sender][tokenCollateral] -= collateralAmount;
-        emit CollateralRedeeemed(msg.sender, tokenCollateral, collateralAmount);
-        bool success = IERC20(tokenCollateral).transfer(msg.sender, collateralAmount);
-        if (!success) {
-            revert STCEngine__tokenTransferFailed();
-        }
+        _redeemCollateral(tokenCollateral, msg.sender, msg.sender, collateralAmount);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
     function burnSTC(uint256 amount) public moreThanzero(amount) {
-        s_STCMinted[msg.sender] -= amount;
-        bool success = i_STC.transferFrom(msg.sender, address(this), amount);
-        if (!success) {
-            revert STCEngine__tokenTransferFailed();
-        }
-        i_STC.burn(amount);
+        _burnSTC(msg.sender, msg.sender, amount);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
@@ -179,17 +172,59 @@ contract STCEngine is ReentrancyGuard {
     /// @notice if we do start nearing undercollateralization, we neeed someone to liquidate
     /// @dev must remove someones position to avoid getting undercollateralization
     /// @param collateral is the address of erc20 collateral token
-    /// @param userToLiquid is the user to liquidate who has broken the health factor
+    /// @param user is the user to liquidate who has broken the health factor
     /// @param amount is the amount of STC we need to burn and liquid
     /// @notice you get bounos for taking the users funds
     /// @notice this function is working assumes the protocol will be roughly 200% overcollateralized in order to work
-    
-    function liquidate(address collateral , address userToLiquid, uint256 amount) external {}
-    function getHealthFactor() external view {}
+
+    function liquidate(address collateral, address user, uint256 amount) external moreThanzero(amount) nonReentrant {
+        // check the health factor of the user to liquidate
+        uint256 startingUserHealthfactor = _healthFactor(user);
+        if (startingUserHealthfactor >= MINIMUM_HEALTH_FACTOR) {
+            revert STCEngine__validHealthFactor();
+        }
+        // take collateral
+        uint256 amountTokenCovered = getTokenAmountInUsd(collateral, amount);
+
+        uint256 bonusCollateral = (amountTokenCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+        uint256 totalCollateralToReedem = amountTokenCovered + bonusCollateral;
+        _redeemCollateral(collateral, user, msg.sender, totalCollateralToReedem);
+
+        // burn STC
+        _burnSTC(user, msg.sender, amount);
+
+        uint256 endingUserHealthfactor = _healthFactor(user);
+        if (endingUserHealthfactor <= startingUserHealthfactor) {
+            revert STCEngine__HealthFactorNotImproved();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    function getHealthFactor() external view {
+      uint256 healthfactor = _healthFactor(msg.sender);
+    }
 
     /// / / / / / / / / / / / / /
     // internal functions / / / / /
     /// / / / / / / / / / / / / /
+
+    function _burnSTC(address targetUser, address stcFrom, uint256 StcToBurn) internal {
+        s_STCMinted[targetUser] -= StcToBurn;
+        bool success = i_STC.transferFrom(stcFrom, address(this), StcToBurn);
+        if (!success) {
+            revert STCEngine__tokenTransferFailed();
+        }
+        i_STC.burn(StcToBurn);
+    }
+
+    function _redeemCollateral(address tokenCollateral, address from, address to, uint256 collateralAmount) internal {
+        s_tokenCollateralDeposited[from][tokenCollateral] -= collateralAmount;
+        emit CollateralRedeeemed(from, to, tokenCollateral, collateralAmount);
+        bool success = IERC20(tokenCollateral).transfer(to, collateralAmount);
+        if (!success) {
+            revert STCEngine__tokenTransferFailed();
+        }
+    }
 
     function _getAccountInformation(address user)
         private
@@ -261,5 +296,14 @@ contract STCEngine is ReentrancyGuard {
     /// / / / / / / / / / / / / /
     function getPriceFeedAddress(address token) public view returns (address) {
         return s_priceFeedsToken[token];
+    }
+
+    function getTokenAmountInUsd(address collateral, uint256 weiAmount)
+        public
+        view
+        returns (uint256 amountTokenCovered)
+    {
+        int256 price = getPriceInUsd(collateral);
+        amountTokenCovered = (weiAmount * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 }
