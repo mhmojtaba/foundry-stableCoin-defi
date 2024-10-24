@@ -21,11 +21,10 @@ contract STCEngine is ReentrancyGuard {
     // errors / / / / /
     /// / / / / / / / / / / / / /
     error STCEngine__MorethanZero();
-    error STCEngine__notAllowedToken(address token);
+    error STCEngine__notAllowedToken();
     error STCEngine__tokenAndPricefeedAddressMustHaveSameLength();
     error STCEngine__tokenTransferFailed();
     error STCEngine__Insufficientbalance();
-    error STCEngine__TransferAmountExceedsBalance();
     error STCEngine__MintFailed();
     error STCEngine__HealthFactorIsBroken(uint256 userHealthFactor);
     error STCEngine__validHealthFactor();
@@ -65,7 +64,7 @@ contract STCEngine is ReentrancyGuard {
 
     modifier tokenAllowed(address token) {
         if (s_priceFeedsToken[token] == address(0)) {
-            revert STCEngine__notAllowedToken(token);
+            revert STCEngine__notAllowedToken();
         }
         _;
     }
@@ -109,7 +108,7 @@ contract STCEngine is ReentrancyGuard {
         uint256 collateralAmountDepositedByUser = s_tokenCollateralDeposited[msg.sender][tokenCollateralAddress];
 
         // checking user balance before transaction
-        if (IERC20(tokenCollateralAddress).balanceOf(msg.sender) >= collateralAmountDepositedByUser) {
+        if (IERC20(tokenCollateralAddress).balanceOf(msg.sender) <= collateralAmountDepositedByUser) {
             revert STCEngine__Insufficientbalance();
         }
 
@@ -125,11 +124,6 @@ contract STCEngine is ReentrancyGuard {
         / Alternative way -> use a third party library /
         * SafeERC20.safeTransferFrom(IERC20(tokenCollateralAddress), msg.sender, address(this), collateralAmount);
         */
-
-        // checking the contract balance after transfering
-        if (IERC20(tokenCollateralAddress).balanceOf(address(this)) >= collateralAmountDepositedByUser) {
-            revert STCEngine__TransferAmountExceedsBalance();
-        }
     }
 
     function redeemCollateralsForSTC(address tokenCollateral, uint256 collateralAmount, uint256 stcAmount) external {
@@ -184,7 +178,7 @@ contract STCEngine is ReentrancyGuard {
             revert STCEngine__validHealthFactor();
         }
         // take collateral
-        uint256 amountTokenCovered = getTokenAmountInUsd(collateral, amount);
+        uint256 amountTokenCovered = getTokenAmountFromUsd(collateral, amount);
 
         uint256 bonusCollateral = (amountTokenCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
         uint256 totalCollateralToReedem = amountTokenCovered + bonusCollateral;
@@ -298,12 +292,16 @@ contract STCEngine is ReentrancyGuard {
         return s_priceFeedsToken[token];
     }
 
-    function getTokenAmountInUsd(address collateral, uint256 weiAmount)
+    function getTokenAmountFromUsd(address collateral, uint256 weiAmount)
         public
         view
         returns (uint256 amountTokenCovered)
     {
         int256 price = getPriceInUsd(collateral);
         amountTokenCovered = (weiAmount * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
+    }
+
+    function getAccountInformation(address user) view public returns (uint256 STCMinted, uint256 collateralValueInUsd) {
+        (STCMinted , collateralValueInUsd) = _getAccountInformation(user);
     }
 }

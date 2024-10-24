@@ -22,7 +22,7 @@ contract CounterTest is Test {
     address public wbtc;
 
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
-    uint256 public constant ERC20_ETH_BALANCE = 10 ether;
+    uint256 public constant ERC20_ETH_BALANCE = 100 ether;
 
     // make user
     address public USER = makeAddr("user");
@@ -43,18 +43,40 @@ contract CounterTest is Test {
         // console.log("setup-wbtcPriceFeed address:", wbtcPriceFeed);
     }
 
-    function testAddresses() public view {
-        for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            console.log("test-tokenAddresses at index", i, "is", tokenAddresses[i]);
-        }
-        for (uint256 i = 0; i < priceFeedAddresses.length; i++) {
-            console.log("test-priceFeedAddresses at index", i, "is", priceFeedAddresses[i]);
-        }
+    // function testAddresses() public view {
+    //     for (uint256 i = 0; i < tokenAddresses.length; i++) {
+    //         console.log("test-tokenAddresses at index", i, "is", tokenAddresses[i]);
+    //     }
+    //     for (uint256 i = 0; i < priceFeedAddresses.length; i++) {
+    //         console.log("test-priceFeedAddresses at index", i, "is", priceFeedAddresses[i]);
+    //     }
+    // }
+
+    /// / / / / / / / / / / / / / / / /
+    // constructor function  / / / / /
+    /// / / / / / / / / / / / / / / /
+
+    function testRevertIfConstructorInputsDoesnotMatch() public {
+        tokenAddresses.push(weth);
+        priceFeedAddresses.push(wethPriceFeed);
+        priceFeedAddresses.push(wbtcPriceFeed);
+
+        vm.expectRevert(STCEngine.STCEngine__tokenAndPricefeedAddressMustHaveSameLength.selector);
+        new STCEngine(tokenAddresses,priceFeedAddresses, address(stableCoin));
     }
 
     /// / / / / / / / / / / / / /
     // Price functions / / / / /
     /// / / / / / / / / / / / / /
+
+    function testGetTokenAmountFromUsd() public {
+        uint256 weiAmount = 10 ether;
+        // 10e18 / 2600 = 3,846,153,846,153,846
+        uint256 expectedAmount = 3846153846153846;
+
+        uint256 actualAmount = stcEngine.getTokenAmountFromUsd(weth,weiAmount);
+        assertEq(expectedAmount, actualAmount);
+    }
 
     function testGetPriceInUsd() public view {
         // Check if the price feed is correctly set
@@ -102,6 +124,35 @@ contract CounterTest is Test {
 
         vm.expectRevert(STCEngine.STCEngine__MorethanZero.selector);
         stcEngine.depositeCollateral(weth, 0);
+        vm.stopPrank();
+    }
+
+    function testRevertWithUnapprovedCollateral() public {
+        ERC20Mock testToken = new ERC20Mock("test" , "test");
+        testToken.mint(USER, AMOUNT_COLLATERAL);
+        vm.startPrank(USER);
+
+        vm.expectRevert(STCEngine.STCEngine__notAllowedToken.selector); // test with inputs
+        stcEngine.depositeCollateral(address(testToken) , AMOUNT_COLLATERAL);
+        vm.stopPrank();
+    }
+
+    modifier depositCollateral() {
+        vm.startPrank(USER);
+        ERC20Mock(weth).approve(address(stcEngine), AMOUNT_COLLATERAL);
+        stcEngine.depositeCollateral(weth, AMOUNT_COLLATERAL);
+        vm.stopPrank();
+        _;
+    }
+
+    function testGetAccountInfo()public depositCollateral(){
+        vm.startPrank(USER);
+        (uint256 STCMinted , uint256 collateralValueInUsd) = stcEngine.getAccountInformation(USER);
+
+        uint256 expectedSTCMinted = 0;
+        uint256 expectedDepositeAmount = stcEngine.getTokenAmountFromUsd(weth,collateralValueInUsd);
+        assertEq(expectedSTCMinted, STCMinted);
+        assertEq(expectedDepositeAmount, AMOUNT_COLLATERAL);
         vm.stopPrank();
     }
 
