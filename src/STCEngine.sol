@@ -195,7 +195,7 @@ contract STCEngine is ReentrancyGuard {
     }
 
     function getHealthFactor() external view {
-      uint256 healthfactor = _healthFactor(msg.sender);
+        uint256 healthfactor = _healthFactor(msg.sender);
     }
 
     /// / / / / / / / / / / / / /
@@ -235,6 +235,11 @@ contract STCEngine is ReentrancyGuard {
     /// @return how close the user to get liquidation
     function _healthFactor(address user) private view returns (uint256) {
         (uint256 STCMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+        return _calculateHealthFactor(STCMinted, collateralValueInUsd);
+    }
+
+    function _calculateHealthFactor(uint256 STCMinted, uint256 collateralValueInUsd) internal pure returns (uint256) {
+        if (STCMinted == 0) return type(uint256).max;
         uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
         return (collateralAdjustedForThreshold * PRECISION) / STCMinted;
     }
@@ -301,7 +306,15 @@ contract STCEngine is ReentrancyGuard {
         amountTokenCovered = (weiAmount * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
 
-    function getAccountInformation(address user) view public returns (uint256 STCMinted, uint256 collateralValueInUsd) {
-        (STCMinted , collateralValueInUsd) = _getAccountInformation(user);
+    function getAccountInformation(address user)
+        public
+        view
+        returns (uint256 STCMinted, uint256 collateralValueInUsd)
+    {
+        (STCMinted, collateralValueInUsd) = _getAccountInformation(user);
+    }
+
+    function calculateHealthFactor(uint256 STCMinted, uint256 collateralValueInUsd) public pure returns (uint256) {
+        return _calculateHealthFactor(STCMinted, collateralValueInUsd);
     }
 }
