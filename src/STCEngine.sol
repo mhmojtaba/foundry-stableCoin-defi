@@ -207,7 +207,10 @@ contract STCEngine is ReentrancyGuard {
     }
 
     function _redeemCollateral(address tokenCollateral, address from, address to, uint256 collateralAmount) internal {
-        s_tokenCollateralDeposited[from][tokenCollateral] -= collateralAmount;
+        unchecked {
+            
+            s_tokenCollateralDeposited[from][tokenCollateral] -= collateralAmount;
+        }
         emit CollateralRedeeemed(from, to, tokenCollateral, collateralAmount);
         bool success = IERC20(tokenCollateral).transfer(to, collateralAmount);
         if (!success) {

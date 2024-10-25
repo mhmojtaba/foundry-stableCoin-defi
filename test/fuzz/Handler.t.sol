@@ -42,6 +42,22 @@ contract Handler is Test {
         vm.stopPrank();
     }
 
+    function minStc(uint256 amountSTC) public {
+        (uint256 STCMinted, uint256 collateralValueInUsd) = stcEngine.getAccountInformation(msg.sender);
+        int256 maxAmountSTCToMint = (int256(collateralValueInUsd) /2) - int256(STCMinted);
+        if (maxAmountSTCToMint < 0) {
+            return;
+        }
+        amountSTC = bound(amountSTC, 0, uint256(maxAmountSTCToMint));
+        if(amountSTC == 0) {
+            return;
+        }
+        vm.startPrank(msg.sender);
+        stcEngine.mintSTC(amountSTC);
+        vm.stopPrank();
+    }
+
+
     function redeemCollateral(
         uint256 collateralSeed, // random vslid collateral
         uint256 collateralAmount // random amount of collateral
