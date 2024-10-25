@@ -11,6 +11,7 @@ import {DeployStcEngine} from "script/DeployStcEngine.s.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {Handler} from "./Handler.t.sol";
 
 // what are invariants?
 // 1. the total supply of STC should always be less than total supply of collaterals
@@ -20,8 +21,7 @@ contract InvariantTest is StdInvariant, Test {
     HelperConfig public helperConfig;
     STCEngine stcEngine;
     StableCoin stableCoin;
-    // address[] public tokenAddresses;
-    // address[] public priceFeedAddresses;
+    Handler handler;
     address public wethPriceFeed;
     address public wbtcPriceFeed;
     address public weth;
@@ -36,7 +36,8 @@ contract InvariantTest is StdInvariant, Test {
     function setUp() public {
         DeployStcEngine deployer = new DeployStcEngine();
         (stcEngine, stableCoin) = deployer.run();
-        targetContract(address(stcEngine));
+        handler = new Handler(stcEngine, stableCoin);
+        targetContract(address(handler));
 
         helperConfig = new HelperConfig();
         (wethPriceFeed, wbtcPriceFeed, weth, wbtc,) = helperConfig.localNetworkConfig();

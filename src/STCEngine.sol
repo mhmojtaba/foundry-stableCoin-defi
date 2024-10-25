@@ -106,12 +106,6 @@ contract STCEngine is ReentrancyGuard {
         emit CollateralDeposited(msg.sender, tokenCollateralAddress, collateralAmount);
 
         uint256 collateralAmountDepositedByUser = s_tokenCollateralDeposited[msg.sender][tokenCollateralAddress];
-
-        // checking user balance before transaction
-        if (IERC20(tokenCollateralAddress).balanceOf(msg.sender) <= collateralAmountDepositedByUser) {
-            revert STCEngine__Insufficientbalance();
-        }
-
         // transfer token from user to this contract
         // the first way -> call the function in low level call
         (bool success, bytes memory data) = address(IERC20(tokenCollateralAddress)).call(
@@ -140,6 +134,7 @@ contract STCEngine is ReentrancyGuard {
         public
         moreThanzero(collateralAmount)
         nonReentrant
+        tokenAllowed(tokenCollateral)
     {
         _redeemCollateral(tokenCollateral, msg.sender, msg.sender, collateralAmount);
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -316,5 +311,53 @@ contract STCEngine is ReentrancyGuard {
 
     function calculateHealthFactor(uint256 STCMinted, uint256 collateralValueInUsd) public pure returns (uint256) {
         return _calculateHealthFactor(STCMinted, collateralValueInUsd);
+    }
+
+    function getCollateralAddress() public view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+        function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    function getAdditionalFeedPrecision() external pure returns (uint256) {
+        return ADDITIONAL_FEED_PRECISION;
+    }
+
+    function getLiquidationThreshold() external pure returns (uint256) {
+        return LIQUIDATION_THRESHOLD;
+    }
+
+    function getLiquidationBonus() external pure returns (uint256) {
+        return LIQUIDATION_BONUS;
+    }
+
+    function getLiquidationPrecision() external pure returns (uint256) {
+        return LIQUIDATION_PRECISION;
+    }
+
+    function getMinHealthFactor() external pure returns (uint256) {
+        return MINIMUM_HEALTH_FACTOR;
+    }
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+    function getStablecoin() external view returns (address) {
+        return address(i_STC);
+    }
+
+    function getCollateralTokenPriceFeed(address token) external view returns (address) {
+        return s_priceFeedsToken[token];
+    }
+
+    function getHealthFactor(address user) external view returns (uint256) {
+        return _healthFactor(user);
+    }
+
+    function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
+        return s_tokenCollateralDeposited[user][token];
     }
 }

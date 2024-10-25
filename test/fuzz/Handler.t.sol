@@ -11,5 +11,57 @@ import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggreg
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 contract Handler is Test {
-    HelperConfig public helperConfig;
+    STCEngine stcEngine;
+    StableCoin stableCoin;
+
+    ERC20Mock weth;
+    ERC20Mock wbtc;
+
+    uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
+
+    constructor(STCEngine _stcEngine, StableCoin _stc) {
+        stableCoin = _stc;
+        stcEngine = _stcEngine;
+
+        address[] memory collateralTokens = stcEngine.getCollateralAddress();
+        weth = ERC20Mock(collateralTokens[0]);
+        wbtc = ERC20Mock(collateralTokens[1]);
+
+    }
+
+    function depositeCollateral(
+        uint256 collateralSeed, // random vslid collateral
+        uint256 collateralAmount // random amount of collateral
+    ) public {
+        ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
+        collateralAmount = bound(collateralAmount, 1, MAX_DEPOSIT_SIZE);
+        vm.startPrank(msg.sender);
+        collateral.mint(msg.sender, collateralAmount);
+        collateral.approve(address(stcEngine), collateralAmount);
+        stcEngine.depositeCollateral(address(collateral), collateralAmount);
+        vm.stopPrank();
+    }
+
+    function redeemCollateral(
+        uint256 collateralSeed, // random vslid collateral
+        uint256 collateralAmount // random amount of collateral
+    ) public {
+        ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
+        uint256 maxCollateralToRedeem = stcEngine.getCollateralBalanceOfUser(msg.sender , address(collateral));
+
+        collateralAmount = bound(collateralAmount, 0, maxCollateralToRedeem);
+        if(collateralAmount == 0) {
+            return;
+        }
+        // vm.assume(collateralAmount == 0);
+        stcEngine.redeemCollateral(address(collateral),collateralAmount);
+
+    }
+
+    function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {
+        if (collateralSeed % 2 == 0) {
+            return weth;
+        }
+        return wbtc;
+    }
 }
