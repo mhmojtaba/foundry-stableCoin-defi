@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {StableCoin} from "./StableCoin.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -29,6 +30,11 @@ contract STCEngine is ReentrancyGuard {
     error STCEngine__HealthFactorIsBroken(uint256 userHealthFactor);
     error STCEngine__validHealthFactor();
     error STCEngine__HealthFactorNotImproved();
+
+    /// / / / / / / / / / / / / /
+    // errors / / / / /
+    /// / / / / / / / / / / / / /
+    using OracleLib for AggregatorV3Interface;
 
     /// / / / / / / / / / / / / /
     // state variables / / / / /
@@ -108,10 +114,10 @@ contract STCEngine is ReentrancyGuard {
         uint256 collateralAmountDepositedByUser = s_tokenCollateralDeposited[msg.sender][tokenCollateralAddress];
         // transfer token from user to this contract
         // the first way -> call the function in low level call
-        (bool success, bytes memory data) = address(IERC20(tokenCollateralAddress)).call(
+        (bool success, ) = address(IERC20(tokenCollateralAddress)).call(
             abi.encodeWithSelector(IERC20.transferFrom.selector, msg.sender, address(this), collateralAmount)
         );
-        if (!success && !(data.length == 0 || abi.decode(data, (bool)))) {
+        if (!success ) {
             revert STCEngine__tokenTransferFailed();
         }
         /*
@@ -284,7 +290,7 @@ contract STCEngine is ReentrancyGuard {
             /*uint timeStamp*/
             ,
             /*uint80 answeredInRound*/
-        ) = dataFeed.latestRoundData();
+        ) = dataFeed.staleCheckLatestRoundData();
         return answer;
     }
 

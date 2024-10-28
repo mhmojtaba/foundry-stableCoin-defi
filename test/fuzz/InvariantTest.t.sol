@@ -36,11 +36,12 @@ contract InvariantTest is StdInvariant, Test {
     function setUp() public {
         DeployStcEngine deployer = new DeployStcEngine();
         (stcEngine, stableCoin) = deployer.run();
+        helperConfig = new HelperConfig();
+        (wethPriceFeed, wbtcPriceFeed, weth, wbtc,) = helperConfig.localNetworkConfig();
+
         handler = new Handler(stcEngine, stableCoin);
         targetContract(address(handler));
 
-        helperConfig = new HelperConfig();
-        (wethPriceFeed, wbtcPriceFeed, weth, wbtc,) = helperConfig.localNetworkConfig();
 
         // ERC20Mock(weth).mint(USER, ERC20_ETH_BALANCE);
     }
@@ -57,7 +58,29 @@ contract InvariantTest is StdInvariant, Test {
         console.log("OpenInvariantTest__totalWbtcDeposited:", totalWbtcDeposited);
         console.log("OpenInvariantTest__wethValue:", wethValue);
         console.log("OpenInvariantTest__wbtcValue:", wbtcValue);
+        console.log("OpenInvariantTest__mint called:", handler.timesMintIsCalled());
 
         assert(StcSupply <= totalWethDeposited + totalWbtcDeposited);
+    }
+
+    function invariant_gettersShouldnotRevert() public view {
+        // all geter functions
+        stcEngine.getConvertedValueInUsd(weth, 1e18);
+        stcEngine.getAdditionalFeedPrecision();
+        stcEngine.getTokenAmountFromUsd(weth, 1e18);
+        stcEngine.getCollateralValueInUsd(msg.sender);
+        stcEngine.getPriceInUsd(weth);
+        stcEngine.getAccountInformation(msg.sender);
+        stcEngine.getStablecoin();
+        stcEngine.getCollateralTokens();
+        stcEngine.getMinHealthFactor();
+        stcEngine.getLiquidationPrecision();
+        stcEngine.getLiquidationBonus();
+        stcEngine.getLiquidationThreshold();
+        stcEngine.getAdditionalFeedPrecision();
+        stcEngine.getPrecision();
+        stcEngine.getCollateralAddress();
+
+
     }
 }

@@ -17,7 +17,13 @@ contract Handler is Test {
     ERC20Mock weth;
     ERC20Mock wbtc;
 
+    uint256 public timesMintIsCalled;
+
     uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
+
+    address[] public usersWithCollateralDeposited;
+
+    MockV3Aggregator public ethUsdPriceFeed;
 
     constructor(STCEngine _stcEngine, StableCoin _stc) {
         stableCoin = _stc;
@@ -27,6 +33,28 @@ contract Handler is Test {
         weth = ERC20Mock(collateralTokens[0]);
         wbtc = ERC20Mock(collateralTokens[1]);
 
+        ethUsdPriceFeed = MockV3Aggregator(stcEngine.getCollateralTokenPriceFeed(address(weth)));
+    }
+
+    
+    function minStc(uint256 amountSTC, uint256 addressSeed) public {
+        if(usersWithCollateralDeposited.length == 0){
+            return;
+        }
+        address sender = usersWithCollateralDeposited[addressSeed % usersWithCollateralDeposited.length];
+        (uint256 STCMinted, uint256 collateralValueInUsd) = stcEngine.getAccountInformation(sender);
+        int256 maxAmountSTCToMint = (int256(collateralValueInUsd) /2) - int256(STCMinted);
+        if (maxAmountSTCToMint < 0) {
+            return;
+        }
+        amountSTC = bound(amountSTC, 0, uint256(maxAmountSTCToMint));
+        if(amountSTC == 0) {
+            return;
+        }
+        vm.startPrank(sender);
+        stcEngine.mintSTC(amountSTC);
+        vm.stopPrank();
+        timesMintIsCalled++;
     }
 
     function depositeCollateral(
@@ -40,23 +68,8 @@ contract Handler is Test {
         collateral.approve(address(stcEngine), collateralAmount);
         stcEngine.depositeCollateral(address(collateral), collateralAmount);
         vm.stopPrank();
+        usersWithCollateralDeposited.push(msg.sender);
     }
-
-    function minStc(uint256 amountSTC) public {
-        (uint256 STCMinted, uint256 collateralValueInUsd) = stcEngine.getAccountInformation(msg.sender);
-        int256 maxAmountSTCToMint = (int256(collateralValueInUsd) /2) - int256(STCMinted);
-        if (maxAmountSTCToMint < 0) {
-            return;
-        }
-        amountSTC = bound(amountSTC, 0, uint256(maxAmountSTCToMint));
-        if(amountSTC == 0) {
-            return;
-        }
-        vm.startPrank(msg.sender);
-        stcEngine.mintSTC(amountSTC);
-        vm.stopPrank();
-    }
-
 
     function redeemCollateral(
         uint256 collateralSeed, // random vslid collateral
@@ -72,6 +85,11 @@ contract Handler is Test {
         // vm.assume(collateralAmount == 0);
         stcEngine.redeemCollateral(address(collateral),collateralAmount);
 
+    }
+
+    function updateCollateralPrice(uint96 newPrice) public {
+        int256 _answer = int256(uint(newPrice));
+        ethUsdPriceFeed.updateAnswer(_answer);
     }
 
     function _getCollateralFromSeed(uint256 collateralSeed) private view returns (ERC20Mock) {
